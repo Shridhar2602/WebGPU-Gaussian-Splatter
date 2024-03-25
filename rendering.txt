@@ -1,0 +1,10 @@
+
+- Parse the .ply file
+	- Create covariance matrix from scaling and rotation
+
+- Sort all the guassians according to their depth
+	- Gaussian depth = pos * (third column of viewMatrix)
+	- sort by this depth
+
+- For each pixel :
+	- alpha blending by traversing guassians front-to-back
