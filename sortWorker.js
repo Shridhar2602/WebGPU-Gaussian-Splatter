@@ -1,9 +1,9 @@
-export function sortGaussiansByDepth(gaussians, viewMatrix) {
+function sortGaussiansByDepth(gaussians, viewMatrix) {
 
 	const calcDepth = (i) => gaussians.positions[i*3] * viewMatrix[12] +
-							gaussians.positions[i*3+1] * viewMatrix[13] +
-							gaussians.positions[i*3+2] * viewMatrix[14] +
-							1 * viewMatrix[15];
+							 gaussians.positions[i*3+1] * viewMatrix[13] +
+							 gaussians.positions[i*3+2] * viewMatrix[14] +
+							 1 * viewMatrix[15];
 
 	// gaussians.positions.sort((a, b) => {
 	// 	const depthA = calcDepth(gaussians.positions.indexOf(a) / 3);
@@ -40,3 +40,9 @@ export function sortGaussiansByDepth(gaussians, viewMatrix) {
 	// return getGaussiansFromSortedIndices(gaussians, indices);
 	// return new Uint32Array(indices);
 }
+
+self.onmessage = function(event) {
+    const data = event.data;
+    const sortedData = sortGaussiansByDepth(data.gaussians, data.viewMatrix); // Example sorting logic
+    self.postMessage(sortedData); // Send back the sorted data
+};

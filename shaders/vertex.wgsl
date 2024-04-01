@@ -94,7 +94,10 @@ const quadVertices = array<vec2<f32>, 6>(
 fn vs(@builtin(vertex_index) vertexIndex : u32) -> vertexShaderOutput {
 	
 	var vsOutput : vertexShaderOutput;
-	let splat = gaussians[vertexIndex / 6];
+	let pointIdx = vertexIndex / 6u;
+	let quadIdx = vertexIndex % 6u;
+	let quadOffset = quadVertices[quadIdx];
+	let splat = gaussians[pointIdx];
 
 	// let p_hom = uniforms.projMatrix * vec4f(splat.mean, 1);
 	// let p_w = 1.0 / (p_hom.w + 1e-7);
@@ -130,9 +133,7 @@ fn vs(@builtin(vertex_index) vertexIndex : u32) -> vertexShaderOutput {
 	var my_radius = ceil(3.0 * sqrt(max(lambda1, lambda2)));
 	let radius_ndc = vec2f(my_radius / uniforms.height, my_radius / uniforms.width);
     // let point_image = vec2f(ndc2Pix(p_proj.x, uniforms.width), ndc2Pix(p_proj.y, uniforms.height));
-
-
-	let quadOffset = quadVertices[vertexIndex % 6];
+	
 	vsOutput.con_o = vec4f(conic, splat.opacity);
 
 	var projPosition = uniforms.projMatrix * vec4f(splat.mean, 1);

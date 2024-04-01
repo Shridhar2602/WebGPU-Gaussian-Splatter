@@ -1,5 +1,5 @@
 import { WebGPU } from "./webgpu-utils.js";
-import { sortGaussiansByDepth, sortGaussiansByDepth2 } from './sort.js';
+import { sortGaussiansByDepth } from './sort.js';
 
 export class Renderer 
 {
@@ -39,10 +39,10 @@ export class Renderer
 	async initBuffers(data, sortedIndices, camera, WIDTH, HEIGHT) {
 
 		this.data = data;
-		const tan_fovy = Math.tan(camera.fov_y * 0.5);
-		const tan_fovx = tan_fovy * WIDTH / HEIGHT;
-		const focal_y = HEIGHT / (2 * tan_fovy);
-		const focal_x = WIDTH / (2 * tan_fovx);
+		const tan_fovy = 0.5 * HEIGHT / camera.fov_y;
+		const tan_fovx = 0.5 * WIDTH / camera.fov_x;
+		const focal_y = camera.fov_y;
+		const focal_x = camera.fov_x;
 
 		this.uniforms = {
 			screenDims: [WIDTH, HEIGHT, focal_x, focal_y],
@@ -64,8 +64,6 @@ export class Renderer
 		let uniformArray = flattenToFloat32Array(this.uniforms);
 		this.bufferArray = createBufferFromGaussians(data);
 		const vertexData = new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]);	// screen sized quad
-
-		console.log(uniformArray)
 
 		this.buffers = {
 			uniforms: this.webGPU.createUniformBuffer('uniformBuffer', uniformArray),
@@ -149,11 +147,18 @@ export class Renderer
 		}
 
 		this.uniforms.viewMatrix = this.camera.viewMatrix;
+		this.uniforms.projMatrix = this.camera.getProjMatrix();
 		this.buffers.uniforms.data = flattenToFloat32Array(this.uniforms);
 		this.webGPU.device.queue.writeBuffer(this.buffers.uniforms.buffer, 0, this.buffers.uniforms.data);
+		
+		
 
 		// ============================== UPDATE GAUSSIAN BUFFER ================================
-		// let gaussians = sortGaussiansByDepth2(this.data, this.camera.viewMatrix);
+		if(this.camera.indexBufferNeedsUpdate == true) {
+			this.webGPU.updateIndexBuffer(this.buffers.indexBuffer);
+			this.camera.indexBufferNeedsUpdate = false;
+		}
+
 
 		// ============================== COMPUTE PASS ================================
 		// let workGroupsNeeded = (this.WIDTH * this.HEIGHT) / 64;
@@ -185,39 +190,6 @@ export class Renderer
 
 		requestAnimationFrame(() => this.renderAnimation());
 	}
-
-	renderSingleFrame()	{
-		this.uniforms.viewMatrix = this.camera.viewMatrix;
-		this.buffers.uniforms.data = flattenToFloat32Array(this.uniforms);
-
-		this.webGPU.device.queue.writeBuffer(this.buffers.uniforms.buffer, 0, this.buffers.uniforms.data);
-
-		// ============================== COMPUTE PASS ================================
-		let encoder = this.webGPU.device.createCommandEncoder({label: 'compute encoder'});
-		let pass = encoder.beginComputePass({label: 'compute pass'});
-		pass.setPipeline(this.computePipeline);
-		pass.setBindGroup(0, this.bindGroupCompute);
-		let workGroupsNeeded = (this.WIDTH * this.HEIGHT) / 64;
-		// pass.dispatchWorkgroups(temp, temp, temp);
-		pass.dispatchWorkgroups(workGroupsNeeded + 1, 1, 1);
-		pass.end();
-	
-
-		// Finish encoding and submit the commands
-		let commandBuffer = encoder.finish();
-		this.webGPU.device.queue.submit([commandBuffer]);
-
-
-		// ============================== RENDER PASS ================================
-		this.webGPU.setCanvasAsRenderTarget(this.renderPassDescriptor);
-		const renderEncoder = this.webGPU.createCommandEncoder('render encoder');
-		// call our vertex shader 6 times (2 triangles)
-		this.webGPU.makeRenderPass(renderEncoder, this.renderPassDescriptor, this.renderPipeline, this.bindGroup, this.buffers.vertex.buffer, 6);
-		this.webGPU.addCommandBufferToQueue(renderEncoder);
-	}
-
-
-
 }
 
 function flattenToFloat32Array(obj) {
@@ -251,8 +223,6 @@ function createBufferFromGaussians(data) {
 			data.cov3Ds[i*6+3], data.cov3Ds[i*6+4], data.cov3Ds[i*6+5], -1
 		)
 	}
-
-	console.log(bufferArray)
 
 	return new Float32Array(bufferArray);
 }

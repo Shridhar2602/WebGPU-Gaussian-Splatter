@@ -158,3 +158,28 @@ function computeCov3D(scale, mod, rot) {
 
     return cov3D
 }
+
+function saveAsJson(data) {
+	// Convert data to JSON string
+	const jsonData = JSON.stringify(data);
+
+	// Create a Blob object with the JSON data
+	const blob = new Blob([jsonData], { type: 'application/json' });
+
+	// Create a link element to trigger the download
+	const link = document.createElement('a');
+	link.href = URL.createObjectURL(blob);
+	link.download = 'exported_data.json'; // Specify the filename
+
+	// Append the link to the document body and trigger the download
+	document.body.appendChild(link);
+	link.click();
+}
+
+export async function loadJson(path) {
+	const start = performance.now();
+	let file = await fetch(path);
+	file = await file.json();
+	console.log(`Loaded ${file.count} gaussians in ${((performance.now() - start)/1000).toFixed(3)}s`);
+	return file;
+}

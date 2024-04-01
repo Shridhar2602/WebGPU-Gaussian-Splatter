@@ -82,6 +82,10 @@ export class WebGPU
 		}
 	}
 
+	updateIndexBuffer(indexBuffer) {
+		this.device.queue.writeBuffer(indexBuffer.buffer, 0, indexBuffer.data);
+	}
+
 	createRenderPipeline(module) {
 		const renderPipeline = this.device.createRenderPipeline({
 			label: 'render pipeline',
@@ -178,7 +182,7 @@ export class WebGPU
 		// 	0,
 		// 	6 * 4 * indexBuffer.data.length
 		// );
-		this.device.queue.writeBuffer(indexBuffer.buffer, 0, indexBuffer.data);
+		// this.device.queue.writeBuffer(indexBuffer.buffer, 0, indexBuffer.data);
 
 	  	const renderPass = renderEncoder.beginRenderPass(renderPassDescriptor);
 	  	renderPass.setPipeline(renderPipeline);
