@@ -8,8 +8,8 @@ export class Camera
 		this.gaussians = data;
 		this.worker = worker;
 		
-		this.fov_y = 900;
-		this.fov_x = 900;
+		this.fov_y = 700;
+		this.fov_x = 700;
 
 		this.projMatrix = mat4.perspective(mat4.create(), 0.82, canvas.width / canvas.height, 0.1, 10000.0);
 
@@ -58,6 +58,9 @@ export class Camera
 		this.eye[0] += this.direction[0] * this.zoomSpeed * Math.sign(delta);
 		this.eye[1] += this.direction[1] * this.zoomSpeed * Math.sign(delta);
 		this.eye[2] += this.direction[2] * this.zoomSpeed * Math.sign(delta);
+		// this.center[0] += this.direction[0] * this.zoomSpeed * Math.sign(delta);
+		// this.center[1] += this.direction[1] * this.zoomSpeed * Math.sign(delta);
+		// this.center[2] += this.direction[2] * this.zoomSpeed * Math.sign(delta);
 
 		this.set_camera();
 	}
@@ -146,12 +149,18 @@ export class Camera
 					camera.update_worker();
 					break;
 				case "ArrowUp":
-					camera.moveUp();
+					// camera.moveUp();
+					// camera.keyPress = 1
+					// camera.update_worker();
+					camera.zoom(-0.3);
 					camera.keyPress = 1
 					camera.update_worker();
 					break;
 				case "ArrowDown":
-					camera.moveDown();
+					// camera.moveDown();
+					// camera.keyPress = 1
+					// camera.update_worker();
+					camera.zoom(0.3);
 					camera.keyPress = 1
 					camera.update_worker();
 					break;

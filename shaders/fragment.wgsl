@@ -33,7 +33,7 @@ fn depth_palette(X: f32) -> vec3f {
     // }
 
 	/////////////////////////////////////////////
-	let d = fsInput.xy;
+	let d = -fsInput.xy;
 	let conic = fsInput.con_o.xyz;
 	let power = -0.5 * (conic.x * d.x * d.x + conic.z * d.y * d.y) + conic.y * d.x * d.y;
 	let opacity = fsInput.con_o.w;

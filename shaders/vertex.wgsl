@@ -136,7 +136,7 @@ fn vs(@builtin(vertex_index) vertexIndex : u32) -> vertexShaderOutput {
 	
 	vsOutput.con_o = vec4f(conic, splat.opacity);
 
-	var projPosition = uniforms.projMatrix * vec4f(splat.mean, 1);
+	var projPosition = uniforms.projMatrix * vec4f(splat.mean, 1.0);
 	projPosition = projPosition / projPosition.w;
 	vsOutput.pos = vec4f(projPosition.xy + 2 * radius_ndc * quadOffset, projPosition.zw);
 	vsOutput.col = splat.color;
