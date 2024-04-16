@@ -1,91 +1,132 @@
 import { vec3, mat4, quat } from 'https://cdn.skypack.dev/gl-matrix';
 
-export class Camera
-{
-	constructor(canvas, data, worker)
-	{
-		this.viewMatrix = mat4.create();
-		this.gaussians = data;
-		this.worker = worker;
+export class Camera {
+    constructor(canvas, data, worker) {
+        this.viewMatrix = mat4.create();
+        this.gaussians = data;
+        this.worker = worker;
+
+        this.fov_y = 700;
+        this.fov_x = 700;
+
+        this.projMatrix = mat4.perspective(mat4.create(), 0.82, canvas.width / canvas.height, 0.1, 10000.0);
+
+        this.eye = vec3.create();
+        this.center = vec3.create();
+        this.up = vec3.create();
+        this.direction = vec3.create();
+        this.rotateAngle = 0;
+
+        this.zoomSpeed = 0.1;
+        this.moveSpeed = 0.01;
+        this.keypressMoveSpeed = 0.1;
+
+        this.MOVING = 0;
+        this.keyPress = 0;
+
+        this.indexBufferNeedsUpdate = true;
+        this.isSorting = false;
+        this.lastSortedViewMatrix = mat4.create();
+
+        this.MoveCamera(canvas, this);
+		this.flag = 1;
+		// this.scaleObjects(100)
 		
-		this.fov_y = 700;
-		this.fov_x = 700;
+    }
 
-		this.projMatrix = mat4.perspective(mat4.create(), 0.82, canvas.width / canvas.height, 0.1, 10000.0);
+	scaleObjects(scale) {
+        // Apply scaling transformation to each object
+        for (let i = 0; i < this.gaussians.length; i++) {
+			this.gaussians.positions[i] = this.gaussians.positions[i]*scale // Example method to scale an object
+        }
+		console.log(this.gaussians.positions)
+    }
 
-		this.eye = vec3.create();
-		this.center = vec3.create();
-		this.up = vec3.create();
-		this.direction = vec3.create();
-		this.rotateAngle = 0;
+    set_camera(eye = this.eye, center = this.center, up = this.up) {
+        vec3.set(this.eye, eye[0], eye[1], eye[2]);
+        vec3.set(this.center, center[0], center[1], center[2]);
+        vec3.set(this.up, up[0], up[1], up[2]);
 
-		this.zoomSpeed = 0.5;
-		this.moveSpeed = 0.01;
-		this.keypressMoveSpeed = 0.1;
+        vec3.subtract(this.direction, this.eye, this.center);
+        mat4.lookAt(this.viewMatrix, eye, center, up);
+    }
 
-		this.MOVING = 0;
-		this.keyPress = 0;
+    update_worker() {
+        if (!this.isSorting) {
+            this.isSorting = true;
+            mat4.copy(this.lastSortedViewMatrix, this.viewMatrix);
+			if(this.flag == 1)
+				this.flag = -1
+			else
+				this.flag = 1
+            this.worker.postMessage({ gaussians: this.gaussians, viewMatrix: this.viewMatrix, flag: this.flag });
+        }
+    }
 
-		this.indexBufferNeedsUpdate = true;
-		this.isSorting = false;
-		this.lastSortedViewMatrix = mat4.copy(mat4.create(), this.viewMatrix);
+    zoom(delta) {
+        vec3.scaleAndAdd(this.eye, this.eye, this.direction, this.zoomSpeed * Math.sign(delta));
+        this.set_camera();
+    }
 
-		this.MoveCamera(canvas, this);
-	}
-
-	set_camera(eye=this.eye, center=this.center, up=this.up)
-	{
-		vec3.set(this.eye, eye[0], eye[1], eye[2])
-		vec3.set(this.center, center[0], center[1], center[2])
-		vec3.set(this.up, up[0], up[1], up[2])
-
-		// console.log(this.eye, this.center, this.up);
-
-		vec3.subtract(this.direction, this.eye, this.center);
-		mat4.lookAt(this.viewMatrix, eye, center, up);
-	}
-
-	update_worker() {
-		if(this.isSorting == false) {
-			this.isSorting = true;
-			mat4.copy(this.lastSortedViewMatrix, this.viewMatrix);
-			this.worker.postMessage({gaussians: this.gaussians, viewMatrix: this.viewMatrix});
-		}
-	}
-
-	zoom(delta)
-	{
-		this.eye[0] += this.direction[0] * this.zoomSpeed * Math.sign(delta);
-		this.eye[1] += this.direction[1] * this.zoomSpeed * Math.sign(delta);
-		this.eye[2] += this.direction[2] * this.zoomSpeed * Math.sign(delta);
-		// this.center[0] += this.direction[0] * this.zoomSpeed * Math.sign(delta);
-		// this.center[1] += this.direction[1] * this.zoomSpeed * Math.sign(delta);
-		// this.center[2] += this.direction[2] * this.zoomSpeed * Math.sign(delta);
-
-		this.set_camera();
-	}
-
-	getProjMatrix() {
-		var flippedY = mat4.clone(this.projMatrix);
-		mat4.mul(flippedY, flippedY, this.diagonal4x4(1, -1, 1, 1));
+    getProjMatrix() {
+        const flippedY = mat4.clone(this.projMatrix);
+        mat4.scale(flippedY, flippedY, [1, -1, 1]); // flip Y
         mat4.multiply(flippedY, flippedY, this.viewMatrix);
-		return flippedY;
-	}
+        return flippedY;
+    }
 
-	move(oldCoord, newCoord)
-	{
-		let dX = (newCoord[0] - oldCoord[0]) * Math.PI / 180 * this.moveSpeed;
-		let dY = (newCoord[1] - oldCoord[1]) * Math.PI / 180 * this.moveSpeed;
+    // move(oldCoord, newCoord) {
+    //     const dX = (newCoord[0] - oldCoord[0]) * this.moveSpeed;
+    //     const dY = (newCoord[1] - oldCoord[1]) * this.moveSpeed;
 
-		this.rotateAngle = dX;
+    //     this.rotateAngle = dX;
 
-		vec3.rotateY(this.eye, this.eye, this.center, -dX);
-		vec3.rotateX(this.eye, this.eye, this.center, -dY);
+    //     vec3.rotateY(this.eye, this.eye, this.center, -dX);
+    //     vec3.rotateX(this.eye, this.eye, this.center, -dY);
 
-		// vec3.rotateY(this.up, this.up, vec3.create(), -dX);
-		// vec3.rotateX(this.up, this.up, vec3.create(), -dY);
+    //     this.set_camera();
+    // }
 
-		this.set_camera();
+	move(oldCoord, newCoord) {
+		const sensitivity = 0.005;
+		const deltaY = -(newCoord[0] - oldCoord[0]) * this.moveSpeed;
+		const deltaX = (newCoord[1] - oldCoord[1]) * this.moveSpeed;
+		// Calculate the rotation quaternion based on mouse movement
+		const rotationQuaternion = quat.create();
+		// Define your custom X and Y axes
+		var customXAxis = [0, 0.886994, 0.461779]; // Example: You have a custom X axis
+		// Find a vector perpendicular to the custom X axis
+		var arbitraryVector = [1, 0, 0]; // An arbitrary vector
+		var customYAxis = vec3.create();
+		vec3.cross(customYAxis, customXAxis, arbitraryVector);
+		vec3.normalize(customYAxis, customYAxis);
+
+		// Calculate rotation quaternion for custom Y axis
+		var rotationYQuaternion = quat.create();
+		quat.setAxisAngle(rotationYQuaternion, customYAxis, sensitivity * deltaX);
+
+		// Calculate rotation quaternion for custom X axis
+		var rotationXQuaternion = quat.create();
+		quat.setAxisAngle(rotationXQuaternion, customXAxis, sensitivity * deltaY);
+
+		// Combine the rotations
+		var combinedRotation = quat.create();
+		quat.multiply(combinedRotation, rotationYQuaternion, rotationXQuaternion);
+
+		// Apply the combined rotation to your object's quaternion
+		quat.multiply(rotationQuaternion, rotationQuaternion, combinedRotation);
+
+		// quat.rotateY(rotationQuaternion, rotationQuaternion, sensitivity * deltaX);
+		// quat.rotateX(rotationQuaternion, rotationQuaternion, sensitivity * deltaY);
+	
+		// Apply the rotation to the camera direction
+		const oldDirection = vec3.create();
+		vec3.subtract(oldDirection, this.eye, this.center);
+		const newDirection = vec3.transformQuat(vec3.create(), oldDirection, combinedRotation);
+	
+		// Update the camera position
+		vec3.add(this.eye, this.center, newDirection);
+		this.set_camera()
 	}
 
 	moveLeft() {
@@ -132,6 +173,7 @@ export class Camera
 		canvas.addEventListener("mouseup", event => {
 			canvas.removeEventListener("mousemove", onMouseMove);
 			this.MOVING = 0;
+			console.log(this.eye)
 			this.update_worker();
 		})
 
