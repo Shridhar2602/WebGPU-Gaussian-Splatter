@@ -18,7 +18,7 @@ export class Camera {
         this.rotateAngle = 0;
 
         this.zoomSpeed = 0.1;
-        this.moveSpeed = 0.01;
+        this.moveSpeed = 0.05;
         this.keypressMoveSpeed = 0.1;
 
         this.MOVING = 0;
@@ -49,6 +49,24 @@ export class Camera {
 
         vec3.subtract(this.direction, this.eye, this.center);
         mat4.lookAt(this.viewMatrix, eye, center, up);
+
+		var cx = center[0];
+		var cy = center[1];
+		var cz = center[2];
+		// var point1 = vec3.fromValues(-0.9117398262023926, 2.2373459339141846, -2.910170078277588);
+		var point1 = vec3.fromValues(-0.7037860751152039, 1.9006421566009521, -1.6949124336242676);
+		var point2 = vec3.fromValues(eye[0], eye[1], eye[2]);
+		var dirVector1 = vec3.subtract(vec3.create(), point1, vec3.fromValues(cx, cy, cz));
+		var dirVector2 = vec3.subtract(vec3.create(), point2, vec3.fromValues(cx, cy, cz));
+		dirVector1[0] = 0;
+		dirVector2[0] = 0;
+		vec3.normalize(dirVector1, dirVector1);
+		vec3.normalize(dirVector2, dirVector2);
+		var dotProduct = vec3.dot(dirVector1, dirVector2);
+		var angleRadians = Math.acos(dotProduct);
+		var angleDegrees = angleRadians * (180 / Math.PI);
+		// console.log(angleDegrees)
+		this.rotated = angleRadians;
     }
 
     update_worker() {
@@ -59,7 +77,7 @@ export class Camera {
 				this.flag = -1
 			else
 				this.flag = 1
-            this.worker.postMessage({ gaussians: this.gaussians, viewMatrix: this.viewMatrix, flag: this.flag });
+            this.worker.postMessage({ gaussians: this.gaussians, viewMatrix: this.viewMatrix, flag: this.rotated });
         }
     }
 
@@ -88,9 +106,11 @@ export class Camera {
     // }
 
 	move(oldCoord, newCoord) {
-		const sensitivity = 0.005;
-		const deltaY = -(newCoord[0] - oldCoord[0]) * this.moveSpeed;
+		const sensitivity = 0.05;
+		const deltaY = (newCoord[0] - oldCoord[0]) * this.moveSpeed;
 		const deltaX = (newCoord[1] - oldCoord[1]) * this.moveSpeed;
+
+		// console.log(deltaY)
 		// Calculate the rotation quaternion based on mouse movement
 		const rotationQuaternion = quat.create();
 		// Define your custom X and Y axes
@@ -103,7 +123,7 @@ export class Camera {
 
 		// Calculate rotation quaternion for custom Y axis
 		var rotationYQuaternion = quat.create();
-		quat.setAxisAngle(rotationYQuaternion, customYAxis, sensitivity * deltaX);
+		quat.setAxisAngle(rotationYQuaternion, customYAxis, sensitivity * 0);
 
 		// Calculate rotation quaternion for custom X axis
 		var rotationXQuaternion = quat.create();
@@ -167,13 +187,14 @@ export class Camera {
 		{
 			newCoord = [event.clientX, event.clientY]
 			camera.move(oldCoord, newCoord)
+			oldCoord = newCoord
 			camera.MOVING = 1;
 		}
 
 		canvas.addEventListener("mouseup", event => {
 			canvas.removeEventListener("mousemove", onMouseMove);
 			this.MOVING = 0;
-			console.log(this.eye)
+			// console.log(this.eye)
 			this.update_worker();
 		})
 

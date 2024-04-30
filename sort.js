@@ -2,12 +2,19 @@ import { vec3, vec4, mat4, quat } from 'https://cdn.skypack.dev/gl-matrix';
 
 export function sortGaussiansByDepth(gaussians, viewMatrix) {
 	let t = performance.now() / 1000;
+	var theta = -Math.PI;
+	var rotationMatrix = mat4.create();
+	mat4.rotateX(rotationMatrix, rotationMatrix, theta);
+	var rotatedViewMatrix = mat4.create();
+	mat4.multiply(rotatedViewMatrix, rotationMatrix, viewMatrix);
 
-	const calcDepth = (i) => 
-		(gaussians.positions[i * 3] * viewMatrix[8] +
-		gaussians.positions[i * 3 + 1] * viewMatrix[9] +
-		gaussians.positions[i * 3 + 2] * viewMatrix[10] +
-		viewMatrix[11]);
+	const calcDepth = (i) => {
+		
+		return (gaussians.positions[i * 3] * rotatedViewMatrix[8] +
+		gaussians.positions[i * 3 + 1] * rotatedViewMatrix[9] +
+		gaussians.positions[i * 3 + 2] * rotatedViewMatrix[10] +
+		rotatedViewMatrix[11]);
+	}
 
 	function getDepthFromViewMatrix(i) {
 		// Convert the point to a glMatrix vec4
@@ -26,32 +33,64 @@ export function sortGaussiansByDepth(gaussians, viewMatrix) {
 		return depth;
 	}
 
-	function countSort1(){
-		let minDepth = Infinity;
-		let maxDepth = -Infinity;
-		for (let i = 0; i < gaussians.count; i++) {
-				const depth = calcDepth(i);
-				minDepth = Math.min(minDepth, depth);
-				maxDepth = Math.max(maxDepth, depth);
+	function quicksort(A, B, lo, hi) {
+		if (lo < hi) {
+			const p = partition(A, B, lo, hi) 
+			quicksort(A, B, lo, p)
+			quicksort(A, B, p + 1, hi) 
 		}
-
-		const count = new Array(gaussians.count).fill(0);
-		for (let i = 0; i < gaussians.count; i++) {
-				const depth = Math.floor(calcDepth(i) * (gaussians.count - 1));
-				count[depth]++;
-		}
-
-		for (let i = 1; i < count.length; i++) {
-				count[i] += count[i - 1];
-		}
-
+	}
+	function partition(A, B, lo, hi) {
+		const pivot = A[Math.floor((hi - lo)/2) + lo]
+		let i = lo - 1 
+		let j = hi + 1
+	  
+		while (true) {
+			do { i++ } while (A[i] < pivot)
+			do { j-- } while (A[j] > pivot)
+		
+			if (i >= j) return j
+			
+			let tmp = A[i]; A[i] = A[j]; A[j] = tmp // Swap A
+				tmp = B[i]; B[i] = B[j]; B[j] = tmp // Swap B
+		}    
+	}
+	function quicksortgaussian(){
+		const depths = new Float32Array(gaussians.count)
 		let indices = Array.from({ length: gaussians.count }, (_, i) => i);
-		for (let i = gaussians.count - 1; i >= 0; i--) {
-				const depth = Math.floor(calcDepth(i) * (gaussians.count - 1));
-				const index = count[depth] - 1;
-				count[depth]--;
-				[indices[i], indices[index]] = [indices[index], indices[i]];
+
+        for (let i = 0; i < gaussians.count; i++) {
+            indices[i] = i
+            depths[i] = calcDepth(i)
+        }
+
+        quicksort(depths, indices, 0, gaussians.count - 1)
+		return indices;
+	}
+
+	function countingSort(){
+		let maxDepth = -Infinity;
+		let minDepth = Infinity;
+		let sizeList = new Int32Array(gaussians.count);
+		let indices = Array.from({ length: gaussians.count }, (_, i) => i);
+
+		for (let i = 0; i < gaussians.count; i++) {
+			const depth = (calcDepth(i) * 4096) | 0
+
+			sizeList[i] = depth
+			maxDepth = Math.max(maxDepth, depth)
+			minDepth = Math.min(minDepth, depth)
 		}
+		
+		let depthInv = (256 * 256) / (maxDepth - minDepth);
+		let counts0 = new Uint32Array(256*256);
+		for (let i = 0; i < gaussians.count; i++) {
+			sizeList[i] = ((sizeList[i] - minDepth) * depthInv) | 0;
+			counts0[sizeList[i]]++;
+		}
+		let starts0 = new Uint32Array(256*256);
+		for (let i = 1; i < 256*256; i++) starts0[i] = starts0[i - 1] + counts0[i - 1];
+		for (let i = 0; i < gaussians.count; i++) indices[starts0[sizeList[i]]++] = i;
 
 		return indices;
 	}
@@ -62,49 +101,12 @@ export function sortGaussiansByDepth(gaussians, viewMatrix) {
 		return indices;
 	}
 
-	function mergeSort(arr, comparator) {
-		if (arr.length <= 1) {
-			return arr;
-		}
-	
-		const middle = Math.floor(arr.length / 2);
-		const left = arr.slice(0, middle);
-		const right = arr.slice(middle);
-	
-		return merge(
-			mergeSort(left, comparator),
-			mergeSort(right, comparator),
-			comparator
-		);
-	}
-	
-	function merge(left, right, comparator) {
-		let result = [];
-		let leftIndex = 0;
-		let rightIndex = 0;
-	
-		while (leftIndex < left.length && rightIndex < right.length) {
-			if (comparator(left[leftIndex], right[rightIndex]) <= 0) {
-				result.push(left[leftIndex]);
-				leftIndex++;
-			} else {
-				result.push(right[rightIndex]);
-				rightIndex++;
-			}
-		}
-	
-		return result.concat(left.slice(leftIndex), right.slice(rightIndex));
-	}
-	
-	function mergeSortIndices() {
-		let indices = Array.from({ length: gaussians.count }, (_, i) => i);
-		return mergeSort(indices, (a, b) => calcDepth(a) - calcDepth(b));
-	}
-	
+
 
 	// let indices = Array.from({ length: gaussians.count }, (_, i) => i);
-	// const indices = countSort1();
-	const indices = defaultSort();
+	const indices = countingSort();
+	// const indices = quicksortgaussian();
+	// const indices = defaultSort();
 	// const indices = mergeSortIndices();
 
 	let indexBuffer = [];
